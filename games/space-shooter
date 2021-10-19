@@ -1,0 +1,500 @@
+import pygame
+from pygame import mixer
+import random
+import time
+
+
+pygame.init()
+
+
+# size of window
+WIDTH, HEIGHT = 800, 800
+
+
+# spaceship width and height
+spaceship_width = 120
+spaceship_height = 120
+
+
+# initial co-ordinate of spaceship (space ship will be at this co - ordinates when game starts)
+spaceship_upper_left_x = WIDTH / 2
+height_from_bottom = spaceship_height  # spaceship will be at this distance from top
+spaceship_upper_left_y = HEIGHT - (height_from_bottom + 50)
+
+
+# dimentions of lasers(width,height)
+laser_dimention = (20, 50)
+# after shooting laser it will move this much of distance per frame
+delta_laser_movement = 2
+
+
+# create window object
+WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
+
+
+# game title
+game_title = "space_shooter"
+
+# setting game title
+pygame.display.set_caption(game_title)
+
+
+# definening colors
+WHITE = 255, 255, 255
+RED = 255, 0, 0
+GREEN = 0, 255, 0
+BLACK = 0, 0, 0
+
+# define health bar max width in pixels
+MAX_HEALTH_BAR_WIDTH = 100
+
+# by this much health/no. of pixels health bar after asteroid hit spaceship
+HEALTH_LOST = 10
+
+# defining frames per seconds
+FPS = 120
+
+# whenever we press left or right arrow key then
+# delta no. of pixels we will move towards left or right
+delta = 10
+
+# this is list of lasers(objects of Laser class) which we have shooted
+shooted_laser_list = []
+
+# this is list of of asteroids(objects of Asteroids class) which is created by computer randomly
+all_asteroids = []
+
+# if distance between 2 image is less than this number of pixels then collision will occur
+ship_asteroid_distance_thrashould = 60
+
+# if distance between laser and asteroid is less than this number of pixels
+laser_asteroid_distance_thrashould = 20
+
+# loading game over music
+game_over_music = mixer.Sound("C:\\Users\Janardhan\PycharmProjects\pythonProject\Assets\mario_game_over_sound.wav")
+
+# game background image
+back_ground_image = pygame.image.load("C:\\Users\Janardhan\PycharmProjects\pythonProject\Assets\game_back_ground.jpg")
+back_ground_image = pygame.transform.scale(back_ground_image, (WIDTH, HEIGHT))
+
+
+# asteroid class
+# we just need to call generate asteroid method of this class to form new asteroids
+
+def give_distance(x1, y1, height, width, x2, y2):
+    """x1:upper left x co ordinte of asteroid
+       y1:upper left y co ordinte of asteroid
+       height:height of asteroid
+       width:width of asteroid
+       we wants to compute distance between asteroid centre and x2,y2"""
+
+    # getting co-ordinates of center of asteroid
+    x1 = x1 + width / 2
+    y1 = y1 + height / 2
+
+    distance = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+    return distance
+
+
+class Asteroid:
+
+    def __init__(self):
+        self.asteroid_list = []
+        asteroid_image0 = pygame.image.load("C:\\Users\Janardhan\PycharmProjects\pythonProject\Assets\Asteroid0.png")
+        asteroid0 = pygame.transform.scale(asteroid_image0, (100, 100))
+        self.asteroid_list.append(asteroid0)
+
+        asteroid_image1 = pygame.image.load("C:\\Users\Janardhan\PycharmProjects\pythonProject\Assets\Asteroid1.png")
+        asteroid1 = pygame.transform.scale(asteroid_image1, (100, 100))
+        self.asteroid_list.append(asteroid1)
+
+        asteroid_image2 = pygame.image.load("C:\\Users\Janardhan\PycharmProjects\pythonProject\Assets\Asteroid2.png")
+        asteroid2 = pygame.transform.scale(asteroid_image2, (100, 100))
+        self.asteroid_list.append(asteroid2)
+
+        asteroid_image3 = pygame.image.load("C:\\Users\Janardhan\PycharmProjects\pythonProject\Assets\Asteroid3.png")
+        asteroid3 = pygame.transform.scale(asteroid_image3, (100, 100))
+        self.asteroid_list.append(asteroid3)
+
+        asteroid_image4 = pygame.image.load("C:\\Users\Janardhan\PycharmProjects\pythonProject\Assets\Asteroid4.png")
+        asteroid4 = pygame.transform.scale(asteroid_image4, (100, 100))
+        self.asteroid_list.append(asteroid4)
+
+        # loading the asteroid crashing sound
+        self.asteroid_collision_sound = mixer.Sound(
+            "C:\\Users\Janardhan\PycharmProjects\pythonProject\Assets\explosion.wav")
+
+    def generate_asteroids(self):
+        # output format of this method
+        # (asteroid_object,x,y,x_incriment, y_incriment)
+        # 1) asteroid_object:- it's an asteroids surface object which
+        # we can plot on pygame window by WINDOW.blit(asteroid_object, (x, y))
+        # 2) (x,y):- upper left co-ordinate of asteroid_object/asteroid image
+        # 3) (x_incriment, y_incriment):- velocity of asteroid in x and y direction which will be unique for each of them
+        # 4) random_scaling_factor:- if defines height and width of asteroid image
+        # /it defines how much big or small asteroid is
+
+        # every time while generating asteroid its unique size/scaling factor will be generated here
+        random_scaling_factor = random.randint(50, 100)
+
+        # for selecting random asteroid out off all available asteroids
+        random_asteroid_index = random.randrange(0, 5)
+        # here we are doing homogenous scaling
+        random_asteroid = pygame.transform.scale(self.asteroid_list[random_asteroid_index],
+                                                 (random_scaling_factor, random_scaling_factor))
+
+        # origin co-ordinates of asteroids (asteroid are going to originate in upper part /above spaceship)
+        x, y = random.randint(-50, WIDTH + 50), random.randint(-50, 0)
+
+        # generating x_incriment , y_incriment which are random for each asteroid & will specify trajectory to each
+        # of them
+
+        # assigning asteroid velocity depending on their position
+        if x <= WIDTH / 2:
+            # if asteroids are originating in upper left of screen/window
+            x_incriment, y_incriment = random.randrange(0, 3), random.randrange(1, 5)
+        else:
+            # if asteroids are originating in upper right of screen/window
+            x_incriment, y_incriment = random.randrange(-3, 0), random.randrange(1, 5)
+
+        return [random_asteroid, x, y, x_incriment, y_incriment, random_scaling_factor]
+
+    # this method will play collision sound if asteroid and spaceship collides
+    def play_asteroid_collision_sound(self):
+        mixer.Sound.play(self.asteroid_collision_sound)
+        time.sleep(0.0001)
+        mixer.music.stop()
+
+    # method for calculating distance between asteroid and given
+
+    # cheaking if asteroid is colliding with the spaceship
+    def is_colliding_with_ship(self, asteroid, x1, y1, height, width, x_spaceship, y_spaceship):
+        """x1:asteroid upper left x
+           y1:asteroid upper left y
+           height:height of asteroid
+           width:width of asteroid
+           x_spaceship : upper left x cordinarte of spaceship
+           y_spaceship : upper left y cordinarte of spaceship"""
+
+        spaceship_center_x_co_ordinate = x_spaceship + spaceship_width / 2
+        spaceship_center_y_co_ordinate = y_spaceship + spaceship_height / 2
+
+        # if distance between center of asteroid and spaceship
+        # is less than some distance_thrashould then we will declare collision
+        distance = give_distance(x1, y1, height, width, spaceship_center_x_co_ordinate,
+                                 spaceship_center_y_co_ordinate)
+
+        # as frame rate is very high that's why we are making sure that ones we consider a asteroid collision have
+        # occured then same asteroid shouldn't be considerd again for collision again
+        if distance <= ship_asteroid_distance_thrashould and my_spaceship.previously_collided_asteroid is not asteroid:
+            self.play_asteroid_collision_sound()
+            my_spaceship.spaceship_collided()
+            my_spaceship.previously_collided_asteroid = asteroid
+
+
+# spaceship class
+class SpaceShip:
+    def __init__(self, x=spaceship_upper_left_x, y=spaceship_upper_left_y):
+        # loading spaceship image
+        self.spaceship_image = pygame.image.load(
+            "C:\\Users\Janardhan\PycharmProjects\pythonProject\Assets\spaceship.png")
+        # scaling spaceship image
+        self.spaceship = pygame.transform.scale(self.spaceship_image, (spaceship_height, spaceship_width))
+
+        # instantanious position of object
+        self.x = x
+        self.y = y
+
+        # instantanious health bar width (initially at maximum)
+        self.present_health_bar_width = MAX_HEALTH_BAR_WIDTH
+
+        # keeping track of most recently collided with spaceship
+        self.previously_collided_asteroid = None
+
+    def display_ship(self, x, y):
+        # window.blit() function shows given surface on window
+        WINDOW.blit(self.spaceship, (x, y))
+
+    def draw_spaceship_health_bar(self, surface, width):
+        pygame.draw.rect(surface, RED, (10, 10, MAX_HEALTH_BAR_WIDTH, 20))
+        pygame.draw.rect(surface, GREEN, (10, 10, width, 20))
+
+    # this method will give instantanious co-ordinates of spaceship
+    def give_spaceship_co_ordinates(self):
+        return self.x, self.y
+
+    def spaceship_collided(self):
+        # in 5 hit by asteroids we'll be dead
+        if self.present_health_bar_width >= 0:
+            self.present_health_bar_width -= HEALTH_LOST
+
+
+# class for handling shooting laser
+class Laser:
+    def __init__(self, ship_co_ordinate_x, ship_co_ordinate_y):
+        # as initial co-ordinates laser = instantanious co-ordinates of spaceship
+        # lasers_initial_upper_left_x_co-ordinate = ship_co_ordinate_x
+        # lasers_initial_upper_left_y_co-ordinate = ship_co_ordinate_y
+
+        # instantanious upper left co-ordinate of laser object
+        self.x = ship_co_ordinate_x
+        self.y = ship_co_ordinate_y
+        # loading laser object
+        self.laser_image = pygame.image.load("C:\\Users\Janardhan\PycharmProjects\pythonProject\Assets\laser_pulse.png")
+        self.laser = pygame.transform.scale(self.laser_image, laser_dimention)  # rescaling laser beam
+
+        # loading the laser sound
+        self.laser_sound = mixer.Sound("C:\\Users\Janardhan\PycharmProjects\pythonProject\Assets\gun_fire_sound.mp3")
+
+    # it gives latest upper_left co-ordinates of laser
+    def give_previous_coordinated(self):
+        return self.x, self.y
+
+    # it updates laser image in every frame
+    def update_laser_co_ordinate(self):
+        # delta_laser_movement:- in every frame this much of pixels laser will move upwards
+        self.y -= delta_laser_movement
+
+    # it shows laser object on screen
+    def display_laser(self, x, y):
+        WINDOW.blit(self.laser, (x, y))
+
+    # laser sound after shooting laser
+    def play_laser_shoot_sound(self):
+        mixer.Sound.play(self.laser_sound)
+        mixer.music.stop()
+
+    # this function will chek if laser is hitting the asteroids
+    def is_laser_hitting_asteroid(self, x_asteroid, y_asteroid, asteroid_height, asteroid_width):
+
+        # getting co-ordinates of center of asteroid
+        x_asteroid = x_asteroid + asteroid_width / 2
+        y_asteroid = y_asteroid + asteroid_height / 2
+
+        # getting co-ordinates of centre of asteroid
+        x_laser, y_laser = self.x, self.y
+        x_laser += laser_dimention[0] / 2
+        y_laser += laser_dimention[1] / 2
+
+        distance = ((x_asteroid - x_laser) ** 2 + (y_asteroid - y_laser) ** 2) ** 0.5
+
+        if distance <= laser_asteroid_distance_thrashould:
+            return True
+        else:
+            return False
+
+
+# creating objects of classes
+my_spaceship = SpaceShip()
+
+# creating object of Asteroid class
+asteroid_object = Asteroid()
+
+
+# this function will draw everything on screen
+def draw_on_window(x, y, score):
+    # show background image on every new frame
+    WINDOW.blit(back_ground_image, (0, 0))
+
+    # showing shooted lasers on screen
+    for laser in shooted_laser_list:
+        # show all lasers then remove unnecessary lasers
+        # because inverse of above will cause error
+
+        laser_co_ordinates = laser.give_previous_coordinated()
+
+        laser.display_laser(laser_co_ordinates[0], laser_co_ordinates[1])
+
+        laser.update_laser_co_ordinate()
+
+        # ones lasers cross the screen delete them ,this is important because if too much asteroids gets saturated over time
+        # then it will consume lot of ram
+        # use below line while playing game to varify this fact (total no. of asteroids should fluctuate about a number)
+        # print(len(shooted_laser_list))
+
+        # if laser's upper left co-ordinates are above x-axis then don't do anything
+        if laser_co_ordinates[1] >= 0:
+            pass
+        # is laser passes screen remove it
+        else:
+            shooted_laser_list.remove(laser)
+
+    # show the spaceship on screen
+    my_spaceship.display_ship(x, y)
+
+    # show asteroids is they are in all_asteroid list
+    if len(all_asteroids) != 0:
+
+        # removing unnecessory asteroids which are leaving
+        # the screen otherwise over time too much ram will get consumed
+        for asteroid in all_asteroids:
+
+            x, y = asteroid[1], asteroid[2]
+
+            # for asteroids initiating from upper side and and moving downwards
+            # if asteroids leaves screen then remove them
+            if y >= 10 + HEIGHT:
+                all_asteroids.remove(asteroid)
+
+        for asteroid in all_asteroids:
+            # all_asteroids is containing list of asteroid objects
+            # information format of asteroid :- [random_asteroid, x, y, x_incriment, y_incriment, random_scaling_factor]
+            for laser in shooted_laser_list:
+                x_asteroid, y_asteroid = asteroid[1], asteroid[2]
+                asteroid_height, asteroid_width = asteroid[-1], asteroid[-1]
+                if laser.is_laser_hitting_asteroid(x_asteroid, y_asteroid, asteroid_height, asteroid_width):
+
+                    # if  laser and asteroid are colliding with each other then delete them both
+                    if asteroid in all_asteroids and laser in shooted_laser_list:  # make sure that both elements exists in corrosponding lists
+                        all_asteroids.remove(asteroid)
+                        shooted_laser_list.remove(laser)
+
+        for asteroid_index, asteroid_info in enumerate(all_asteroids):
+            # extracting asteroid information
+
+            # surface of asteroid
+            asteroid = asteroid_info[0]
+
+            x, y = asteroid_info[1], asteroid_info[2]
+
+            x_spaceship, y_spaceship = my_spaceship.give_spaceship_co_ordinates()
+
+            height_of_asteroid, width_of_asteroid = asteroid_info[-1], asteroid_info[-1]
+
+            # playing asteroid sound
+            asteroid_object.is_colliding_with_ship(asteroid, x, y, height_of_asteroid, width_of_asteroid, x_spaceship,
+                                                   y_spaceship)
+
+            # update the position of remaining asteroid
+            x_incriment, y_incriment = asteroid_info[-3], asteroid_info[-2]
+            x += x_incriment
+            y += y_incriment
+
+            # append new co ordinate to list
+
+            all_asteroids[asteroid_index][1], all_asteroids[asteroid_index][2] = x, y
+
+            WINDOW.blit(asteroid, (x, y))
+
+    # drawing health bar on top of everything otherwise it will get overlapped by asteroid
+    my_spaceship.draw_spaceship_health_bar(WINDOW, my_spaceship.present_health_bar_width)
+
+    # drawing score bar on last to avoid overlapping with asteriods
+    font = pygame.font.Font('freesansbold.ttf', 30)
+
+    # create a text surface object,
+    # on which text is drawn on it.
+    text = font.render(str("score:") + str(score), True, RED, BLACK)
+
+    # create a rectangular object for the
+    # text surface object
+    textrect = text.get_rect()
+
+    # set the center of the rectangular object.
+    textrect.center = (WIDTH / 2, 50)
+
+    WINDOW.blit(text, textrect)
+
+    pygame.display.update()
+
+
+# main code which is running every thing
+def main():
+    run = True
+
+    # definening the clock object
+    clock = pygame.time.Clock()
+
+    # initially spaceship will be at middle of bottom part
+    x = WIDTH / 2 - spaceship_width / 2
+    y = spaceship_upper_left_y
+
+    game_home_page = pygame.image.load(
+        "C:\\Users\Janardhan\PycharmProjects\pythonProject\Assets\game_home_page.jpg")
+
+    game_home_page = pygame.transform.scale(game_home_page, (HEIGHT, WIDTH))
+
+    starting_sound = mixer.Sound("C:\\Users\Janardhan\PycharmProjects\pythonProject\Assets\game_starting_music.wav")
+
+    mixer.Sound.play(starting_sound)
+    mixer.music.stop()
+
+    WINDOW.blit(game_home_page, (0, 0))
+    pygame.display.update()
+    time.sleep(8)
+
+    i = 0
+    score = 0
+    while run:
+        # setting fps for game
+        clock.tick(FPS)
+        # new asteroid will be created at asteroid formation rate
+        # after 50 frames new asteroid will be generated
+        if i == 50:
+            all_asteroids.append(asteroid_object.generate_asteroids())
+            i = 0
+
+        # score will be updates as long as we live(it is function of time)
+        if i % 10 == 0:
+            score += 1
+
+        i += 1
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+            pressed = pygame.key.get_pressed()
+
+            # cheaking if any key is pressed
+            if event.type == pygame.KEYDOWN or pressed[pygame.K_a] or pressed[pygame.K_d]:
+                # move left if a is pressed
+                if pressed[pygame.K_a] and x >= 0:
+                    x -= delta
+
+                # move right if d is pressed
+                if pressed[pygame.K_d] and x + spaceship_width <= WIDTH:
+                    x += delta
+
+                # create an laser object if w key is pressed
+                if pressed[pygame.K_w]:
+                    # setting lasers x co-ordinates so that laser will be in middle of spaceship
+                    laser_x = x + spaceship_width / 2 - laser_dimention[0] / 2
+                    laser_y = y
+
+                    # creating laser object
+                    laser_object = Laser(laser_x, laser_y)
+                    # appending newly created laser
+                    shooted_laser_list.append(laser_object)
+                    # playing laser sound whenever we shoot laser
+                    laser_object.play_laser_shoot_sound()
+
+        if my_spaceship.present_health_bar_width <= 0:
+            game_over_image = pygame.image.load(
+                "C:\\Users\Janardhan\PycharmProjects\pythonProject\Assets\game_over_image.png")
+            game_over_image = pygame.transform.scale(game_over_image, (300, 300))
+            WINDOW.blit(game_over_image, (WIDTH / 2 - 150, HEIGHT / 2 - 150))
+            pygame.display.update()
+
+            mixer.Sound.play(game_over_music)
+
+            mixer.music.stop()
+
+            time.sleep(6)
+            pygame.quit()
+
+        # draw on the everything on screen
+        draw_on_window(x, y, score)
+
+    # if while loop is breaked  then close window
+    pygame.quit()
+
+
+# making sure that
+# this game will onely run if this function is called
+
+if __name__ == "__main__":
+    main()
+
+
+# Notes =>
+# 1) if we don't place fps limitation on while loop then it will
+# run as its full capacity and consume computation so running at given FPS
